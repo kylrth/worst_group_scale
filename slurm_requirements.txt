@@ -1,0 +1,6 @@
+# These are requirements that can be installed from wheels available on ComputeCanada nodes. The
+# others get downloaded as wheels by slurm_env.sh and then installed by run.sh before running
+# experiments.
+scikit_learn==1.0.2
+tensorboard==2.8.0
+tqdm==4.63.1
