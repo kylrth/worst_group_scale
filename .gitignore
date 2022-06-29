@@ -1,0 +1,8 @@
+checkpoints/
+data/
+data.tar
+wheels/
+
+slurm-*.out
+
+__pycache__/
