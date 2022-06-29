@@ -21,6 +21,7 @@ class TrainConfig:
     momentum: float = 0.9
     lr_step: int = 30
     weight_decay: float = 1e-4
+    seed: int = 0
     grad_accum_factor: int = 1
 
     def exp_id(self):
@@ -80,6 +81,7 @@ class Recorder:
             "momentum": config.momentum,
             "lr_step": config.lr_step,
             "weight_decay": config.weight_decay,
+            "seed": config.seed,
         }
         if config.objective == "irm":
             self.hparams.update(

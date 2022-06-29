@@ -1,7 +1,8 @@
 import argparse
 import os
-import sys
+import random
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim.lr_scheduler import StepLR
@@ -226,6 +227,9 @@ def main(exp, wilds_dir, model_cache, tensorboard_dir, checkpoint_dir):
             model_name=model_name,
         )
 
+        random.seed(config.seed)
+        np.random.seed(config.seed)
+        torch.manual_seed(config.seed)
         trainset, valset, grouper = setup_dataset(
             config.dataset, config.dataset_groups(), wilds_dir
         )
