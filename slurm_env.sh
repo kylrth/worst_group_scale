@@ -34,9 +34,7 @@ for factory in [
     models.resnet18,
     models.resnet34,
     models.resnet50,
-    models.vit_b_16,
     models.vit_b_32,
-    models.vit_l_16,
     models.vit_l_32,
 ]:
     model = factory(pretrained=True)

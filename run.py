@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import os
 import random
 
@@ -220,14 +221,30 @@ def main(exp, wilds_dir, model_cache, tensorboard_dir, checkpoint_dir):
     # This part of the file is meant to be edited to add the sorts of experiments you'd like to run.
     # I'm not a fan of computing the experiment parameters from the SLURM array ID in bash. So we'll
     # define a list of experiments here and let the SLURM array ID index them.
-    exps = []
-    for model_name in ["resnet18", "vit_b_16"]:
-        exps.append(model_name)
+    exps = list(
+        itertools.product(
+            ["celebA", "waterbirds"],
+            ["erm", "irm", ("ilc", 0.1), ("ilc", 0.25), ("ilc", 0.5)],
+            ["resnet18", "resnet34", "resnet50", "vit_b_32", "vit_l_32"],
+            [True, False],  # pretrained
+        )
+    )
+    # unpack ILC-specific param so we don't duplicate non-ILC exps
+    for i, e in enumerate(exps):
+        if e[1][0] == "ilc":
+            e = e[0], "ilc", e[2], e[3], e[1][1]
+        else:
+            e = *e, 0.0
+        exps[i] = e
 
-    if exp != "all":
-        # select the experiment according to the SLURM array ID
-        exps = exps[exp : exp + 1]
-        print(f"running experiment {exp}: {exps[0]}")
+    if exp == -1:
+        for i, e in enumerate(exps):
+            print(f"{i}: {e}")
+        return
+
+    # select the experiment according to the SLURM array ID
+    exps = exps[exp : exp + 1]
+    print(f"running experiment {exp}: {exps[0]}")
 
     device = "cpu"
     if torch.cuda.is_available():
@@ -236,10 +253,15 @@ def main(exp, wilds_dir, model_cache, tensorboard_dir, checkpoint_dir):
         device = "cpu"
     print("training with", device)
 
-    for model_name in exps:
+    for ds, obj, m, pre, agree in exps:
         config = utils.TrainConfig(
-            dataset="celebA",
-            model_name=model_name,
+            dataset=ds,
+            model_name=m,
+            pretrained=pre,
+            epochs=30 if ds == "celebA" else 100,
+            objective=obj,
+            ilc_agreement_threshold=agree,
+            lr=0.0005 if pre else 0.01,
         )
 
         random.seed(config.seed)
@@ -256,7 +278,12 @@ def main(exp, wilds_dir, model_cache, tensorboard_dir, checkpoint_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "exp", metavar="EXP", type=int, default="all", nargs="?", help="experiment number to run"
+        "exp",
+        metavar="EXP",
+        type=int,
+        default=-1,
+        nargs="?",
+        help="experiment number to run. If -1, instead prints the experiment combinations.",
     )
     parser.add_argument(
         "--wilds", type=str, default="./data/", help="path where WILDS data can be stored"

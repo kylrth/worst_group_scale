@@ -24,7 +24,12 @@ pip install wheels/*
 cd $SLURM_TMPDIR
 mkdir -p work/data
 cd work
-tar -xf $PROJECT_HOME/data.tar --directory ./data/ --checkpoint=20000 ./celebA_v1.0
+if [ "$SLURM_ARRAY_TASK_ID" -lt 50 ]; then
+    DATASET="./celebA_v1.0"
+else
+    DATASET="./waterbirds_v1.0"
+fi
+tar -xf $PROJECT_HOME/data.tar --directory ./data/ --checkpoint=20000 "$DATASET"
 
 python $PROJECT_HOME/run.py $SLURM_ARRAY_TASK_ID \
     --model-cache ~/scratch/torch_cache \
