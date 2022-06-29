@@ -38,7 +38,21 @@ def init_model(model_name="resnet18", pretrained=False, model_cache="", device="
     if model_cache != "":
         torch.hub.set_dir(model_cache)
 
-    model = getattr(models, model_name)(pretrained=pretrained, num_classes=1)
+    model = getattr(models, model_name)(pretrained=pretrained)
+
+    # replace the last layer with a random-init layer of the output size we want (1)
+    # We can't use num_classes=1 in the model factory above, because pretrained models don't come in
+    # that size so it won't know how to init the last layer.
+    if model_name == "resnet50":
+        model.fc = nn.Linear(2048, 1)
+    elif model_name.startswith("resnet"):
+        model.fc = nn.Linear(512, 1)
+    elif model_name.startswith("vit_b"):
+        model.heads[-1] = nn.Linear(768, 1)
+    elif model_name.startswith("vit_l"):
+        model.heads[-1] = nn.Linear(1024, 1)
+
+    model.train()
 
     return model.to(device)
 
