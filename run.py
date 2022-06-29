@@ -9,9 +9,11 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from tqdm import tqdm
 from wilds import get_dataset
-from wilds.common.data_loaders import get_eval_loader, get_train_loader
+from wilds.common.data_loaders import get_eval_loader
 from wilds.common.grouper import CombinatorialGrouper
 
+from ilc import get_grads as ilc_grads
+from ilc import get_train_loader
 import utils
 
 
@@ -49,8 +51,12 @@ def train(config: utils.TrainConfig, model, trainset, valset, recorder, device="
     sched = StepLR(optim, step_size=config.lr_step)
 
     # data loading
-    trainloader = get_train_loader("standard", trainset, batch_size=config.batch_size)
-    valloader = get_eval_loader("standard", valset, batch_size=config.batch_size)
+    trainloader = get_train_loader(
+        "standard", trainset, batch_size=config.batch_size, drop_last=config.objective == "ilc"
+    )
+    valloader = get_eval_loader(
+        "standard", valset, batch_size=config.batch_size, drop_last=config.objective == "ilc"
+    )
 
     # look for checkpoints
     ep = recorder.latest_checkpoint(model, optim, sched)
@@ -87,73 +93,83 @@ def train_iteration(config, model, optim, x, y, metadata, epoch, it, loss, recor
     z = recorder.grouper.metadata_to_group(metadata)
     optim.zero_grad()
 
-    while True:
-        try:
-            actual_batch = len(x) // config.grad_accum_factor
+    # This is left over from supporting grad accumulation, which I removed because it won't work
+    # with ILC as we've got it currently, and the GPUs are big enough for the other experiments
+    # anyway.
+    actual_batch = len(x) // config.grad_accum_factor
 
-            # collect group losses/counts across entire batch
-            agg_loss = 0.0
-            agg_penalty = 0.0
-            losses = [0.0] * recorder.n_groups
-            penalties = [0.0] * recorder.n_groups
-            counts = [0] * recorder.n_groups
+    # collect group losses/counts across entire batch
+    agg_loss = 0.0
+    agg_penalty = 0.0
+    losses = [0.0] * recorder.n_groups
+    counts = [0] * recorder.n_groups
 
-            for idx in range(0, len(x), actual_batch):
-                ex = x[idx : idx + actual_batch].to(device)
-                why = y[idx : idx + actual_batch].to(device)
-                zee = z[idx : idx + actual_batch].to(device)
+    for idx in range(0, len(x), actual_batch):
+        ex = x[idx : idx + actual_batch].to(device)
+        why = y[idx : idx + actual_batch].float().to(device)
+        zee = z[idx : idx + actual_batch].to(device)
+        logits = torch.sigmoid(model(ex))
 
-                logits = torch.sigmoid(model(ex))
-                batch_loss, batch_penalty = penalty(
-                    config.objective, loss, logits, why.unsqueeze(-1).float()
-                )
+        # accumulate group losses/counts (this is just straight-up loss, not necessarily the
+        # training objective)
+        batch_loss = loss(logits, why.unsqueeze(-1))
+        agg_loss += torch.sum(batch_loss).item()
+        for i in range(recorder.n_groups):
+            mask = zee.eq(i).unsqueeze(-1)
+            losses[i] += torch.sum(batch_loss * mask).item()
+            counts[i] += torch.sum(mask).item()
 
-                # accumulate group losses/counts
-                for i in range(recorder.n_groups):
-                    mask = zee.eq(i).unsqueeze(-1)
-                    losses[i] += torch.sum(batch_loss * mask).item()
-                    penalties[i] += torch.sum(batch_penalty * mask).item()
-                    counts[i] += torch.sum(mask).item()
+        # This is the training objective.
+        p = penalty(config, loss, logits, why, batch_loss, epoch, optim)
+        if config.objective != "ilc":
+            # We don't call backward if it's ILC because the penalty function actually sets
+            # the gradients itself.
+            p.backward()
+        agg_penalty += p.item()
 
-                l = torch.sum(batch_loss) / config.batch_size
-                p = torch.sum(batch_penalty) / config.batch_size
+    recorder.report_train(it, agg_loss, losses, counts, agg_penalty)
 
-                # see https://github.com/facebookresearch/InvariantRiskMinimization/blob/main/code/colored_mnist/main.py#L145
-                p_weight = config.penalty_weight if epoch >= config.penalty_anneal else 1.0
-                l += p_weight * p
-                if p_weight > 1.0:
-                    # keep gradients in a reasonable range
-                    l /= p_weight
-
-                l.backward()
-                agg_loss += l.item()
-                agg_penalty += p.item()
-
-            recorder.report_train(it, agg_loss, agg_penalty, losses, penalties, counts)
-
-            break
-        except RuntimeError as e:
-            if not str(e).startswith("CUDA out of memory."):
-                raise
-
-            torch.cuda.empty_cache()
-            config.grad_accum_factor = config.grad_accum_factor * 2
-            print("OOM! increasing gradient accumulation factor to", config.grad_accum_factor)
     optim.step()
 
 
-def penalty(penalty_type: str, loss: nn.Module, logits, y):
-    """Returns the loss and the penalty."""
-    if penalty_type.lower() == "erm":
-        l = loss(logits, y)
-        return l, torch.zeros_like(l)
-    if penalty_type.lower() == "irm":
-        scale = logits.new(1.0).requires_grad_()
-        l = loss(logits * scale, y)
-        grad = torch.autograd.grad(l, [scale], create_graph=True)[0]
-        return l, torch.sum(grad**2)
+def penalty(
+    config: utils.TrainConfig, loss: nn.Module, logits, y, batch_loss, epoch: int, optim
+) -> torch.Tensor:
+    """Returns the training loss for the objective specified by the config."""
+    if config.objective == "erm":
+        return torch.sum(batch_loss) / config.batch_size
 
-    raise NotImplementedError(f"unrecognized penalty type {penalty_type}")
+    if config.objective == "irm":
+        scale = logits.new_tensor(1.0, requires_grad=True)  # place on same device as logits
+        l = loss(logits * scale, y.unsqueeze(-1))
+        grad = torch.autograd.grad(l.mean(), [scale], create_graph=True)[0]
+        p = torch.sum(grad**2)
+
+        l = torch.sum(l) / config.batch_size
+
+        # see https://github.com/facebookresearch/InvariantRiskMinimization/blob/main/code/colored_mnist/main.py#L145
+        p_weight = config.irm_weight if epoch >= config.irm_anneal else 1.0
+        l += p_weight * p
+        if p_weight > 1.0:
+            # keep gradients in a reasonable range
+            l /= p_weight
+        return l
+
+    if config.objective == "ilc":
+        l, _ = ilc_grads(
+            agreement_threshold=config.ilc_agreement_threshold,
+            batch_size=1,
+            loss_fn=loss,
+            n_agreement_envs=len(y),
+            params=optim.param_groups[0]["params"],
+            output=logits,
+            target=y,
+            method="and_mask",
+            scale_grad_inverse_sparsity=1.0,
+        )
+        return l
+
+    raise NotImplementedError(f"unrecognized penalty type {config.objective}")
 
 
 def validation(model, valloader, epoch, loss, recorder, device="cuda:0"):

@@ -14,8 +14,9 @@ class TrainConfig:
     batch_size: int = 128
     epochs: int = 30
     objective: str = "erm"
-    penalty_weight: float = 100000
-    penalty_anneal: int = 10
+    irm_weight: float = 100000
+    irm_anneal: int = 10
+    ilc_agreement_threshold: float = 0.3
     lr: float = 0.01
     momentum: float = 0.9
     lr_step: int = 30
@@ -80,13 +81,16 @@ class Recorder:
             "lr_step": config.lr_step,
             "weight_decay": config.weight_decay,
         }
-        if config.objective != "erm":
+        if config.objective == "irm":
             self.hparams.update(
                 {
-                    "penalty_weight": config.penalty_weight,
-                    "penalty_anneal": config.penalty_anneal,
+                    "irm_weight": config.irm_weight,
+                    "irm_anneal": config.irm_anneal,
                 }
             )
+        elif config.objective == "ilc":
+            self.hparams["ilc_agreement_threshold"] = config.ilc_agreement_threshold
+
         os.makedirs(tb_base, exist_ok=True)
         self.board = SummaryWriter(os.path.join(tb_base, exp_id))
 
