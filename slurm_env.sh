@@ -22,7 +22,7 @@ pip download --no-deps \
 popd
 
 # cache pretrained torchvision models
-pip install --no-index torchvision
+pip install --no-index wheels/*
 python -c '
 import os
 import torch
@@ -43,7 +43,6 @@ for factory in [
 '
 
 # cache WILDS data in a tarfile to copy to compute nodes
-pip install --no-index wheels/*
 python -c '
 from wilds import get_dataset
 

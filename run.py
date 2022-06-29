@@ -19,7 +19,7 @@ import utils
 
 
 def setup_dataset(dataset: str, groups, root_dir: str):
-    dataset = get_dataset(dataset=dataset, root_dir=root_dir, download=True)
+    dataset = get_dataset(dataset=dataset, root_dir=root_dir)
 
     train = dataset.get_subset(
         "train",
@@ -60,7 +60,7 @@ def train(config: utils.TrainConfig, model, trainset, valset, recorder, device="
     )
 
     # look for checkpoints
-    ep = recorder.latest_checkpoint(model, optim, sched)
+    ep = recorder.latest_checkpoint(model, optim, sched, device)
     if ep == 0:
         print("starting with fresh model")
         # run evaluation once at the beginning
@@ -69,7 +69,8 @@ def train(config: utils.TrainConfig, model, trainset, valset, recorder, device="
         print("starting from checkpointed epoch", ep)
 
     # train
-    t = tqdm(initial=ep, total=config.epochs * len(trainloader))
+    model.train()
+    t = tqdm(initial=ep * len(trainloader), total=config.epochs * len(trainloader), mininterval=10)
     while ep < config.epochs:
         print("starting epoch", ep + 1)
         for i, (x, y, metadata) in enumerate(trainloader):
@@ -86,8 +87,8 @@ def train(config: utils.TrainConfig, model, trainset, valset, recorder, device="
         validation(model, valloader, ep, bce_loss, recorder, device)
         recorder.checkpoint(ep, model, optim, sched)
 
-    t.close()
     recorder.close()
+    t.close()
 
 
 def train_iteration(config, model, optim, x, y, metadata, epoch, it, loss, recorder, device):
@@ -233,12 +234,8 @@ def main(exp, wilds_dir, model_cache, tensorboard_dir, checkpoint_dir):
         trainset, valset, grouper = setup_dataset(
             config.dataset, config.dataset_groups(), wilds_dir
         )
-        model = init_model(
-            config.model_name, config.pretrained, device=device, model_cache=model_cache
-        )
-        recorder = utils.Recorder(
-            config, valset, grouper, tb_base=tensorboard_dir, ckpt_base=checkpoint_dir
-        )
+        model = init_model(config.model_name, config.pretrained, model_cache, device)
+        recorder = utils.Recorder(config, valset, grouper, tensorboard_dir, checkpoint_dir)
         train(config, model, trainset, valset, recorder, device)
 
 

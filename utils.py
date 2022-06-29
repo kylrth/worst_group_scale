@@ -168,12 +168,12 @@ class Recorder:
             os.path.join(self.ckpt_dir, f"{epoch}.pt"),
         )
 
-    def latest_checkpoint(self, model, optim, sched) -> int:
+    def latest_checkpoint(self, model, optim, sched, device) -> int:
         """Find the latest checkpoint and load the state. Return the last completed epoch."""
         # find the latest checkpoint by number
         latest_ckpt = 0
         for f in glob.glob(os.path.join(self.ckpt_dir, "*.pt")):
-            num = int(f[:-3])  # remove .pt
+            num = int(os.path.basename(f)[:-3])  # remove .pt
             if num > latest_ckpt:
                 latest_ckpt = num
 
@@ -182,7 +182,7 @@ class Recorder:
             return 0
 
         # load the checkpoint
-        ckpt = torch.load(os.path.join(self.ckpt_dir, f"{latest_ckpt}.pt"))
+        ckpt = torch.load(os.path.join(self.ckpt_dir, f"{latest_ckpt}.pt"), map_location=device)
         model.load_state_dict(ckpt["model"])
         optim.load_state_dict(ckpt["optim"])
         sched.load_state_dict(ckpt["sched"])
