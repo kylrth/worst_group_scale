@@ -205,7 +205,14 @@ class Recorder:
         self.val_acc_f.close()
 
     def checkpoint(self, epoch, model, optim, sched):
-        """Store a checkpoint for a completed epoch."""
+        """Store a checkpoint for a completed epoch. Only keep the last five checkpoints."""
+        if epoch > 5:
+            try:
+                os.remove(os.path.join(self.ckpt_dir, f"{epoch-5}.pt"))
+            except OSError:
+                # it's ok if it doesn't exist
+                pass
+
         torch.save(
             {
                 "model": model.state_dict(),
