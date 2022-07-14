@@ -1,5 +1,6 @@
 #!/bin/bash
-# remember to run slurm_env.sh once first
+# This is the script for running on the Compute Canada environment.
+# remember to run env_cc.sh once first
 #
 #SBATCH --time=0-08:00:00
 #SBATCH --mem=16GB

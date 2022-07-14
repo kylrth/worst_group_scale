@@ -1,6 +1,7 @@
 checkpoints/
 data/
 data.tar
+.env/
 wheels/
 
 slurm-*.out
