@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import itertools
 import os
 import random
@@ -217,6 +218,12 @@ def validation(model, valloader, epoch, loss, recorder, device="cuda:0"):
         model.train()
 
 
+def get_device():
+    if torch.cuda.is_available():
+        return "cuda:0"
+    return "cpu"
+
+
 def main(exp, wilds_dir, model_cache, tensorboard_dir, checkpoint_dir):
     # This part of the file is meant to be edited to add the sorts of experiments you'd like to run.
     # I'm not a fan of computing the experiment parameters from the SLURM array ID in bash. So we'll
@@ -246,11 +253,7 @@ def main(exp, wilds_dir, model_cache, tensorboard_dir, checkpoint_dir):
     exps = exps[exp : exp + 1]
     print(f"running experiment {exp}: {exps[0]}")
 
-    device = "cpu"
-    if torch.cuda.is_available():
-        device = "cuda:0"
-    else:
-        device = "cpu"
+    device = get_device()
     print("training with", device)
 
     for ds, obj, m, pre, agree in exps:
@@ -303,10 +306,19 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main(
-        args.exp,
-        *(
-            os.path.expanduser(p)
-            for p in [args.wilds, args.model_cache, args.tensorboard, args.checkpoints]
-        ),
-    )
+    try:
+        main(
+            args.exp,
+            *(
+                os.path.expanduser(p)
+                for p in [args.wilds, args.model_cache, args.tensorboard, args.checkpoints]
+            ),
+        )
+    except RuntimeError as err:
+        # provide more information for discovering GPU issues
+        ts = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        instance = utils.get_instance_id()
+        print(
+            f"ERROR at {ts} on {instance} {get_device()}: {type(err).__name__}: {err}", flush=True
+        )
+        raise err

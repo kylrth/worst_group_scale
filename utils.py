@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import glob
 import os
 
+import requests
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
@@ -249,3 +250,14 @@ def count_groups(subset, grouper):
 
     # assumes all groups are represented!
     return z.unique(sorted=True, return_counts=True)[1]
+
+
+def get_instance_id() -> str:
+    """On StabilityAI infrastructure this will return the instance ID. Otherwise returns "???"."""
+    try:
+        resp = requests.get("http://169.254.169.254/latest/meta-data/instance-id")
+    except Exception:
+        # likely not on StabilityAI infrastructure
+        return "???"
+
+    return resp.text
