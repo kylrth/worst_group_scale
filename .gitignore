@@ -2,6 +2,7 @@ checkpoints/
 data/
 data.tar
 .env/
+runs/
 wheels/
 
 slurm-*.out
