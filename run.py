@@ -231,18 +231,11 @@ def main(exp, wilds_dir, model_cache, tensorboard_dir, checkpoint_dir):
     exps = list(
         itertools.product(
             ["celebA", "waterbirds"],
-            ["erm", "irm", ("ilc", 0.1), ("ilc", 0.25), ("ilc", 0.5)],
-            ["resnet18", "resnet34", "resnet50", "vit_b_32", "vit_l_32"],
-            [True, False],  # pretrained
+            ["erm"],
+            ["resnet18", "resnet34", "resnet50"],
+            list(range(1, 11)),  # seed
         )
     )
-    # unpack ILC-specific param so we don't duplicate non-ILC exps
-    for i, e in enumerate(exps):
-        if e[1][0] == "ilc":
-            e = e[0], "ilc", e[2], e[3], e[1][1]
-        else:
-            e = *e, 0.0
-        exps[i] = e
 
     if exp == -1:
         for i, e in enumerate(exps):
@@ -256,15 +249,15 @@ def main(exp, wilds_dir, model_cache, tensorboard_dir, checkpoint_dir):
     device = get_device()
     print("training with", device)
 
-    for ds, obj, m, pre, agree in exps:
+    for ds, obj, m, seed in exps:
         config = utils.TrainConfig(
             dataset=ds,
             model_name=m,
-            pretrained=pre,
+            pretrained=True,
             epochs=30 if ds == "celebA" else 100,
             objective=obj,
-            ilc_agreement_threshold=agree,
-            lr=0.0005 if pre else 0.01,
+            lr=0.0005,
+            seed=seed,
         )
 
         random.seed(config.seed)

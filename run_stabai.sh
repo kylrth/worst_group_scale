@@ -6,7 +6,7 @@
 #SBATCH --job-name=scaling-wgp
 #SBATCH --cpus-per-task=4
 #SBATCH --gpus-per-node=1
-#SBATCH --array=0
+#SBATCH --array=0-2
 
 set -e
 
@@ -16,7 +16,11 @@ PROJECT_HOME=~/worst_group_scale
 cd $PROJECT_HOME
 source .env/bin/activate
 
-python $PROJECT_HOME/run.py $SLURM_ARRAY_TASK_ID \
-    --model-cache ~/torch_cache \
-    --tensorboard $PROJECT_HOME/runs \
-    --checkpoints $PROJECT_HOME/checkpoints
+for n in {0..19}
+do
+    task=$(($SLURM_ARRAY_TASK_ID+3*$n))
+    python $PROJECT_HOME/run.py $task \
+        --model-cache ~/torch_cache \
+        --tensorboard $PROJECT_HOME/runs \
+        --checkpoints $PROJECT_HOME/checkpoints
+done
