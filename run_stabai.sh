@@ -22,5 +22,5 @@ do
     python $PROJECT_HOME/run.py $task \
         --model-cache ~/torch_cache \
         --tensorboard $PROJECT_HOME/runs \
-        --checkpoints $PROJECT_HOME/checkpoints
+        --checkpoints /fsx/worst_group_scale/checkpoints
 done
