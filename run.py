@@ -233,7 +233,6 @@ def main(exp, wilds_dir, model_cache, tensorboard_dir, checkpoint_dir):
             ["celebA", "waterbirds"],
             ["erm"],
             ["resnet18", "resnet34", "resnet50"],
-            list(range(1, 11)),  # seed
         )
     )
 
@@ -249,7 +248,7 @@ def main(exp, wilds_dir, model_cache, tensorboard_dir, checkpoint_dir):
     device = get_device()
     print("training with", device)
 
-    for ds, obj, m, seed in exps:
+    for ds, obj, m in exps:
         config = utils.TrainConfig(
             dataset=ds,
             model_name=m,
@@ -257,12 +256,10 @@ def main(exp, wilds_dir, model_cache, tensorboard_dir, checkpoint_dir):
             epochs=30 if ds == "celebA" else 100,
             objective=obj,
             lr=0.0005,
-            seed=seed,
+            seed=random.randint(0, 1_000_000),
         )
 
-        random.seed(config.seed)
-        np.random.seed(config.seed)
-        torch.manual_seed(config.seed)
+        utils.set_random_seed(config.seed)
         trainset, valset, grouper = setup_dataset(
             config.dataset, config.dataset_groups(), wilds_dir
         )

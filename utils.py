@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 import glob
 import os
+import random
 
+import numpy as np
 import requests
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -14,6 +16,13 @@ def text_2_bool(s: str) -> bool:
         return False
 
     raise ValueError(f"expected bool; got '{s}'")
+
+
+def set_random_seed(seed):
+    """Sets the seed for Python, PyTorch, and NumPy."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
 
 @dataclass
