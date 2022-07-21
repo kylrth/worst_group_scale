@@ -125,12 +125,15 @@ class Recorder:
         self.val_loss_f = open(os.path.join(self.tb_dir, "val_loss.csv"), "a+")
         self.val_acc_f = open(os.path.join(self.tb_dir, "val_acc.csv"), "a+")
 
-        # write the headers
+        # write the headers if the files are new
         train_header = ",".join(f'"{k}"' if "," in k else k for k in self.train_csv_header) + "\n"
         valid_header = ",".join(f'"{k}"' if "," in k else k for k in self.valid_csv_header) + "\n"
-        self.train_loss_f.write(train_header)
-        self.val_loss_f.write(valid_header)
-        self.val_acc_f.write(valid_header)
+        if self.train_loss_f.tell() == 0:
+            self.train_loss_f.write(train_header)
+        if self.val_loss_f.tell() == 0:
+            self.val_loss_f.write(valid_header)
+        if self.val_acc_f.tell() == 0:
+            self.val_acc_f.write(valid_header)
 
     def _dict_to_csv(self, d, is_valid: bool) -> str:
         if is_valid:
