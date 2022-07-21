@@ -7,6 +7,15 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 
+def text_2_bool(s: str) -> bool:
+    if s == "True":
+        return True
+    if s == "False":
+        return False
+
+    raise ValueError(f"expected bool; got '{s}'")
+
+
 @dataclass
 class TrainConfig:
     dataset: str = "celebA"
@@ -40,6 +49,39 @@ class TrainConfig:
             f",lr={self.lr},momentum={self.momentum},lr_step={self.lr_step}"
             f",weight_decay={self.weight_decay},seed={self.seed}"
         )
+
+        return out
+
+    @classmethod
+    def from_exp_id(cls, s: str):
+        parts = s.split(",")
+        if len(parts) < 11 or len(parts) > 12:
+            raise ValueError(f"weird exp ID '{s}'")
+
+        out = cls()
+        out.dataset = parts[0]
+        out.model_name = parts[1]
+
+        # These are the (comma-separated) keys and values we expect to find in the ID.
+        keys = [
+            ("pretrained", text_2_bool),
+            ("batch_size", int),
+            ("epochs", int),
+            ("objective", str),
+            ("lr", float),
+            ("momentum", float),
+            ("lr_step", int),
+            ("weight_decay", float),
+            ("seed", int),
+        ]
+        if parts[5] == "objective=ilc":
+            keys.insert(4, ("ilc_agreement_threshold", float))
+
+        # extract each expected entry, and complain if the keys aren't found where they're expected
+        for i, (name, convert) in enumerate(keys):
+            if not parts[2 + i].startswith(name + "="):
+                raise ValueError(f"weird name '{s}'")
+            setattr(out, name, convert(parts[2 + i][len(name) + 1 :]))
 
         return out
 
