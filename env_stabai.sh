@@ -32,8 +32,11 @@ for factory in [
 
 # cache WILDS data in a tarfile to copy to compute nodes
 python -c '
+import os
+
 from wilds import get_dataset
 
-get_dataset("celebA", root_dir="./data", download=True)
-get_dataset("waterbirds", root_dir="./data", download=True)
+home = os.path.expanduser("~/data")
+get_dataset("celebA", root_dir=home, download=True)
+get_dataset("waterbirds", root_dir=home, download=True)
 '
