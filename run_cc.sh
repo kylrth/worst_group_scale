@@ -18,7 +18,7 @@ module load python/3.9 scipy-stack cuda cudnn
 virtualenv --no-download $SLURM_TMPDIR/env
 source $SLURM_TMPDIR/env/bin/activate
 pip install --no-index --upgrade pip
-pip install --no-index -r slurm_requirements.txt
+pip install --no-index -r requirements_cc.txt
 pip install wheels/*
 
 # copy WILDS data from local (extract only celebA)

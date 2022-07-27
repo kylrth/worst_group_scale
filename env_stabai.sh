@@ -9,9 +9,8 @@ source .env/bin/activate
 pip install -U pip
 pip install \
     torch==1.11.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html \
-    torchvision==0.12+cu113 -f https://download.pytorch.org/whl/torchvision/ \
-    wilds==2.0.0
-pip install -r slurm_requirements.txt
+    torchvision==0.12+cu113 -f https://download.pytorch.org/whl/torchvision/
+pip install -r requirements_stabai.txt
 
 # cache pretrained torchvision models
 python -c '

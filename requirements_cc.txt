@@ -1,5 +1,5 @@
 # These are requirements that can be installed from wheels available on ComputeCanada nodes. The
-# others get downloaded as wheels by slurm_env.sh and then installed by run.sh before running
+# others get downloaded as wheels by env_cc.sh and then installed by run_cc.sh before running
 # experiments.
 scikit_learn
 tensorboard
